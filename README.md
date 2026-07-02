@@ -81,6 +81,7 @@ Although there is still significant room for improvement, the project successful
 * Fix a bug in the battle reward system
 * Re-check in-game memory addresses (one or two may be incorrect, potentially causing issues)
 * Consider implementing a more robust DQN variant to enhance behavior
+* More unit tests
 
 ## References
 
