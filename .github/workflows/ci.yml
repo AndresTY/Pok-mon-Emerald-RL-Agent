@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  LIBTORCH_VERSION: "2.5.1"
+  LIBTORCH_URL: "https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-2.5.1%2Bcpu.zip"
+
+jobs:
+  build:
+    name: Build (Release)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache LibTorch
+        id: cache-libtorch
+        uses: actions/cache@v4
+        with:
+          path: /opt/libtorch
+          key: libtorch-${{ env.LIBTORCH_VERSION }}-cpu
+
+      - name: Download LibTorch
+        if: steps.cache-libtorch.outputs.cache-hit != 'true'
+        run: |
+          curl -L "${{ env.LIBTORCH_URL }}" -o libtorch.zip
+          sudo unzip -q libtorch.zip -d /opt
+          rm libtorch.zip
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config \
+            libsdl2-dev libsdl2-ttf-dev libmgba-dev
+
+      - name: Configure
+        run: >
+          cmake -B build -S .
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH=/opt/libtorch
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokemon_rl_agent-release
+          path: build/pokemon_rl_agent
+
+  sanitizers:
+    name: Sanitizer (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: address+undefined
+            flags: "-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1"
+            env_vars: "ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1"
+          - name: thread
+            flags: "-fsanitize=thread -fno-omit-frame-pointer -g -O1"
+            env_vars: "TSAN_OPTIONS=halt_on_error=1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache LibTorch
+        id: cache-libtorch
+        uses: actions/cache@v4
+        with:
+          path: /opt/libtorch
+          key: libtorch-${{ env.LIBTORCH_VERSION }}-cpu
+
+      - name: Download LibTorch
+        if: steps.cache-libtorch.outputs.cache-hit != 'true'
+        run: |
+          curl -L "${{ env.LIBTORCH_URL }}" -o libtorch.zip
+          sudo unzip -q libtorch.zip -d /opt
+          rm libtorch.zip
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config \
+            libsdl2-dev libsdl2-ttf-dev libmgba-dev
+
+      - name: Configure with sanitizer flags
+        run: >
+          cmake -B build -S .
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_PREFIX_PATH=/opt/libtorch
+          -DCMAKE_CXX_FLAGS="${{ matrix.flags }}"
+          -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.flags }}"
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      # Smoke test: no ROM, run in binary
+      - name: Run smoke test under sanitizer
+        run: |
+          export ${{ matrix.env_vars }}
+          ./build/pokemon_rl_agent --help
+
+      - name: Upload sanitizer logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanitizer-logs-${{ matrix.name }}
+          path: |
+            build/*.log
+          if-no-files-found: ignore
