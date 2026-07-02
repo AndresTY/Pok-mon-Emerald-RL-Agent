@@ -6,6 +6,7 @@
 ![PyTorch](https://img.shields.io/badge/LibTorch-PyTorch-orange.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey.svg)
+![CI](https://github.com/AndresTY/Pok-mon-Emerald-RL-Agent/actions/workflows/ci.yml/badge.svg)
 
 *A deep reinforcement learning agent trained with DQN to autonomously play and complete **Pokémon Emerald***
 
