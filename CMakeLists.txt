@@ -92,6 +92,51 @@ if(NOT MGBA_INCLUDE_DIR OR NOT MGBA_LIBRARY)
     )
 endif()
 
+option(BUILD_TESTS "compile unit tests" OFF)
+
+if(BUILD_TESTS)
+    enable_testing()
+
+    include(FetchContent)
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.zip
+    )
+    FetchContent_MakeAvailable(googletest)
+
+    # Librería con la lógica pura (sin SDL2/LibTorch), reutilizando los
+    # mismos .cpp que ya compila el ejecutable principal.
+    add_library(pokemon_rl_core STATIC
+        ${CMAKE_SOURCE_DIR}/src/MemoriaJuego.cpp
+        ${CMAKE_SOURCE_DIR}/src/SistemaRecompensas.cpp
+    )
+
+    target_include_directories(pokemon_rl_core PUBLIC
+        ${CMAKE_SOURCE_DIR}/libraries
+    )
+    target_include_directories(pokemon_rl_core PRIVATE
+        ${MGBA_INCLUDE_DIR}
+    )
+    target_link_libraries(pokemon_rl_core PUBLIC
+        ${MGBA_LIBRARY}
+    )
+    target_compile_options(pokemon_rl_core PRIVATE -Wall -Wextra -pedantic)
+
+    add_executable(unit_tests
+        ${CMAKE_SOURCE_DIR}/tests/test_memoria_juego.cpp
+        ${CMAKE_SOURCE_DIR}/tests/test_sistema_recompensas.cpp
+    )
+
+    target_link_libraries(unit_tests PRIVATE
+        pokemon_rl_core
+        gtest_main
+    )
+
+    include(GoogleTest)
+    gtest_discover_tests(unit_tests)
+endif()
+
 set(HEADERS
     ${CMAKE_SOURCE_DIR}/libraries/pokemon.h
     ${CMAKE_SOURCE_DIR}/libraries/MemoriaJuego.h
@@ -150,23 +195,5 @@ install(FILES ${HEADERS}
     DESTINATION include/pokemon_rl_agent
 )
 
-message(STATUS "═══════════════════════════════════════")
-message(STATUS "")
-message(STATUS "Project Structure:")
-message(STATUS "  pokemon-rl/")
-message(STATUS "  ├── CMakeLists.txt")
-message(STATUS "  ├── libraries/")
-message(STATUS "  │   └── *.h      (interfaces)")
-message(STATUS "  ├── src/")
-message(STATUS "  │   └── *.cpp")
-message(STATUS "  ├── build/                    (generated during compilation)")
-message(STATUS "  └── *.gba                     (ROM files)")
-message(STATUS "")
-message(STATUS "Build Instructions:")
-message(STATUS "  mkdir build && cd build")
-message(STATUS "  cmake ..")
-message(STATUS "  make -j$(nproc)")
-message(STATUS "")
-message(STATUS "═══════════════════════════════════════")
-message(STATUS "")
+
 

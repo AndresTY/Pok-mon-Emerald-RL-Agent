@@ -43,9 +43,14 @@ jobs:
           cmake -B build -S .
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_PREFIX_PATH=/opt/libtorch
+          -DBUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build -j"$(nproc)"
+
+      - name: Run unit tests (Release, without sanitizers)
+        working-directory: build
+        run: ctest --output-on-failure
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
@@ -96,14 +101,20 @@ jobs:
           cmake -B build -S .
           -DCMAKE_BUILD_TYPE=Debug
           -DCMAKE_PREFIX_PATH=/opt/libtorch
+          -DBUILD_TESTS=ON
           -DCMAKE_CXX_FLAGS="${{ matrix.flags }}"
           -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.flags }}"
 
-      - name: Build
+      - name: Build (binary + unit_tests)
         run: cmake --build build -j"$(nproc)"
 
-      # Smoke test: no ROM, run in binary
-      - name: Run smoke test under sanitizer
+      - name: Run unit tests under sanitizer
+        working-directory: build
+        run: |
+          export ${{ matrix.env_vars }}
+          ctest --output-on-failure
+
+      - name: Run smoke test of main binary under sanitizer
         run: |
           export ${{ matrix.env_vars }}
           ./build/pokemon_rl_agent --help
